@@ -1,0 +1,7 @@
+version: '3'
+
+tasks:
+  dev:
+    desc: "Run dev server with backend and frontend hot-reloading"
+    cmds:
+      - templ generate --watch --proxy="http://localhost:3000" --proxyport=7331 --cmd="go run ."
