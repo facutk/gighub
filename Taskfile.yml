@@ -4,4 +4,12 @@ tasks:
   dev:
     desc: "Run dev server with backend and frontend hot-reloading"
     cmds:
+      - task --parallel dev:templ dev:tailwind
+
+  dev:templ:
+    cmds:
       - templ generate --watch --proxy="http://localhost:3000" --proxyport=7331 --cmd="go run ."
+
+  dev:tailwind:
+    cmds:
+      - npx -y @tailwindcss/cli -i ./assets/css/input.css -o ./assets/css/styles.css --watch
