@@ -29,7 +29,7 @@ func Home() templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<html><body><div>gighub</div><p>now we are rocking baby</p></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<html><head><script src=\"https://unpkg.com/htmx.org@2.0.4\"></script><link href=\"/assets/css/styles.css\" rel=\"stylesheet\"></head><body class=\"p-2\"><div class=\"flex items-center align-middle\"><img src=\"/assets/logo.svg\" alt=\"gighub logo\" class=\"w-16 h-16 mr-2\"><div class=\"text-3xl font-bold text-pink-500\">gighub</div></div><p class=\"italic text-sm text-gray-500\">sounds good</p></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
