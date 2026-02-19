@@ -34,3 +34,4 @@ go.work.sum
 node_modules/
 
 *_templ.go
+assets/css/styles.css
