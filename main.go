@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"os"
 
 	"gighub/utils"
 	"gighub/views"
@@ -33,9 +34,14 @@ func main() {
 	// Serve static files from the ./assets directory
 	utils.FileServer(r, "/assets", http.Dir("./assets"))
 
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "3000"
+	}
+
 	// Start the server
-	fmt.Println("Server starting on port 3000...")
-	err := http.ListenAndServe(":3000", r)
+	fmt.Printf("Server starting on port %s...\n", port)
+	err := http.ListenAndServe(":"+port, r)
 	if err != nil {
 		fmt.Printf("Error starting server: %s\n", err)
 	}
