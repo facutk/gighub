@@ -47,6 +47,12 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o gighub .
 # Stage 3: Create a minimal image to run the application
 FROM alpine:3.20
 
+# ARG must be after FROM. This defines a build-time variable that can be passed with --build-arg
+ARG GITSHA
+
+# ENV sets the environment variable in the final image. It will be available to the running container.
+ENV GITSHA=${GITSHA}
+
 WORKDIR /app
 
 # Add non-root user for security

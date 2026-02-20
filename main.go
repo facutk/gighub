@@ -27,6 +27,16 @@ func main() {
 		views.Home().Render(r.Context(), w)
 	})
 
+	// Route to display the application version (Git SHA)
+	r.Get("/version", func(w http.ResponseWriter, r *http.Request) {
+		gitSHA := os.Getenv("GITSHA")
+		if gitSHA == "" {
+			gitSHA = "dev" // Default for local development
+		}
+		w.Header().Set("Content-Type", "text/plain")
+		w.Write([]byte(gitSHA))
+	})
+
 	r.Get("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./assets/favicon.ico")
 	})
