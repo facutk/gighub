@@ -1,22 +1,14 @@
 package views
 
 templ Home() {
-<html lang="es">
-<head>
-	<meta charset="UTF-8" />
-	<link href={ CssPath } rel="stylesheet" />
-	<title>gighub</title>
-	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-</head>
-
-<body class="p-2 bg-gray-100">
-	<div class="flex items-center align-middle">
-		<img src="/assets/logo.svg" alt="gighub logo" class="w-16 h-16 mr-2" />
-		<div class="text-3xl font-bold text-pink-500">gighub</div>
-	</div>
-
-	<p class="italic text-sm text-gray-500">sounds good</p>
-	<script src="https://unpkg.com/htmx.org@2.0.4" async></script>
-</body>
-</html>
+	@Layout("gighub") {
+		<div class="p-2">
+			<div class="flex items-center align-middle">
+				<img src="/assets/logo.svg" alt="gighub logo" class="w-16 h-16 mr-2"/>
+				<div class="text-3xl font-bold text-pink-500">gighub</div>
+			</div>
+			<p class="italic text-sm text-gray-500">sounds good</p>
+			<a href="/guestbook" class="text-indigo-600 hover:text-indigo-500">View Guestbook</a>
+		</div>
+	}
 }

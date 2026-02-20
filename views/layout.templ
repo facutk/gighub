@@ -1,0 +1,17 @@
+package views
+
+templ Layout(title string) {
+	<html lang="en">
+		<head>
+			<meta charset="UTF-8"/>
+			<title>{ title }</title>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<link href={ CssPath } rel="stylesheet"/>
+			<link rel="icon" href="/assets/logo.svg" sizes="any" type="image/svg+xml"/>
+		</head>
+		<body class="bg-gray-100">
+			{ children... }
+      <script src="https://unpkg.com/htmx.org@2.0.4" async></script>
+		</body>
+	</html>
+}

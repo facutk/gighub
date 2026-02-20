@@ -4,12 +4,19 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sync"
 
 	"gighub/utils"
 	"gighub/views"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+)
+
+// In-memory storage for the guestbook
+var (
+	guestbookMessage = "Hello! Welcome to the guestbook."
+	guestbookMutex   sync.RWMutex
 )
 
 func main() {
@@ -27,6 +34,25 @@ func main() {
 		views.Home().Render(r.Context(), w)
 	})
 
+	// Guestbook routes
+	r.Get("/guestbook", func(w http.ResponseWriter, r *http.Request) {
+		guestbookMutex.RLock()
+		msg := guestbookMessage
+		guestbookMutex.RUnlock()
+		views.Guestbook(msg).Render(r.Context(), w)
+	})
+
+	r.Post("/guestbook", func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "Invalid request", http.StatusBadRequest)
+			return
+		}
+		guestbookMutex.Lock()
+		guestbookMessage = r.FormValue("message")
+		guestbookMutex.Unlock()
+		http.Redirect(w, r, "/guestbook", http.StatusSeeOther)
+	})
+
 	// Route to display the application version (Git SHA)
 	r.Get("/version", func(w http.ResponseWriter, r *http.Request) {
 		gitSHA := os.Getenv("GITSHA")
@@ -35,10 +61,6 @@ func main() {
 		}
 		w.Header().Set("Content-Type", "text/plain")
 		w.Write([]byte(gitSHA))
-	})
-
-	r.Get("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./assets/favicon.ico")
 	})
 
 	// Serve static files from the ./assets directory
