@@ -1,0 +1,12 @@
+# Git
+.git
+.gitignore
+
+# Docker
+Dockerfile
+
+# Go build artifact
+gighub
+
+# Node
+node_modules

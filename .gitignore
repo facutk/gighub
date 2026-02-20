@@ -32,6 +32,6 @@ go.work.sum
 # .vscode/
 
 node_modules/
-
+tmp/
 *_templ.go
 assets/css/styles.css
