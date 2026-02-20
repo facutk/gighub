@@ -33,6 +33,11 @@ COPY . .
 # Copy the compiled CSS from the frontend stage
 COPY --from=frontend-builder /app/assets/css/styles.css ./assets/css/styles.css
 
+# Hash the CSS file for cache busting and update the Go variable
+RUN hash=$(sha256sum assets/css/styles.css | head -c 8) && \
+    mv assets/css/styles.css assets/css/styles.$hash.css && \
+    echo "package views; var CssPath = \"/assets/css/styles.$hash.css\"" > views/css.go
+
 # Generate templ files
 RUN templ generate
 
