@@ -70,7 +70,7 @@ jobs:
             # Restart container
             docker stop gighub || true
             docker rm gighub || true
-            docker run -d --restart unless-stopped -p 3000:3000 --env-file .env --name gighub $FULL_IMAGE
+            docker run -d --restart unless-stopped -p 4000:3000 --env-file .env --name gighub $FULL_IMAGE
             
             # Cleanup old images to save disk space
             docker image prune -f
