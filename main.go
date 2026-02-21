@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 
 	"gighub/db"
 	"gighub/utils"
@@ -30,8 +31,18 @@ func main() {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
+	dataDir := "data"
+	// Check if the data directory is writable by creating a temporary file.
+	// This provides a clearer error message than the cryptic SQLite one.
+	tmpFile, err := os.Create(filepath.Join(dataDir, ".writable"))
+	if err != nil {
+		log.Fatalf("Error: The data directory ('%s') is not writable. Please check permissions. Original error: %s", dataDir, err)
+	}
+	tmpFile.Close()
+	os.Remove(tmpFile.Name())
+
 	// Initialize Database
-	dbConn, err := sql.Open("sqlite", "data/gighub.db")
+	dbConn, err := sql.Open("sqlite", filepath.Join(dataDir, "gighub.db"))
 	if err != nil {
 		log.Fatalf("Error opening database: %s", err)
 	}
