@@ -4,6 +4,7 @@ tasks:
   dev:
     desc: "Run dev server with backend and frontend hot-reloading"
     cmds:
+      - task: generate:sql
       - task --parallel dev:templ dev:tailwind
 
   dev:templ:
@@ -13,3 +14,7 @@ tasks:
   dev:tailwind:
     cmds:
       - npx -y @tailwindcss/cli -i ./assets/css/input.css -o ./assets/css/styles.css --watch
+
+  generate:sql:
+    cmds:
+      - sqlc generate

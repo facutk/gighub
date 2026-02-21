@@ -1,23 +1,23 @@
 package main
 
 import (
+	"database/sql"
+	"embed"
 	"fmt"
 	"net/http"
 	"os"
-	"sync"
 
+	"gighub/db"
 	"gighub/utils"
 	"gighub/views"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	_ "modernc.org/sqlite"
 )
 
-// In-memory storage for the guestbook
-var (
-	guestbookMessage = "Hello! Welcome to the guestbook."
-	guestbookMutex   sync.RWMutex
-)
+//go:embed db/migrations/*.sql
+var migrationsFS embed.FS
 
 func main() {
 	// Initialize the router
@@ -29,6 +29,35 @@ func main() {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
+	// Initialize Database
+	if err := os.MkdirAll("data", 0755); err != nil {
+		fmt.Printf("Error creating data directory: %s\n", err)
+		os.Exit(1)
+	}
+
+	dbConn, err := sql.Open("sqlite", "data/gighub.db")
+	if err != nil {
+		fmt.Printf("Error opening database: %s\n", err)
+		os.Exit(1)
+	}
+	defer dbConn.Close()
+
+	// Run migrations
+	entries, err := migrationsFS.ReadDir("db/migrations")
+	if err != nil {
+		fmt.Printf("Error reading migrations: %s\n", err)
+		os.Exit(1)
+	}
+	for _, entry := range entries {
+		content, _ := migrationsFS.ReadFile("db/migrations/" + entry.Name())
+		if _, err := dbConn.Exec(string(content)); err != nil {
+			fmt.Printf("Error running migration %s: %s\n", entry.Name(), err)
+			os.Exit(1)
+		}
+	}
+
+	queries := db.New(dbConn)
+
 	// Define the route
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		views.Home().Render(r.Context(), w)
@@ -36,9 +65,15 @@ func main() {
 
 	// Guestbook routes
 	r.Get("/guestbook", func(w http.ResponseWriter, r *http.Request) {
-		guestbookMutex.RLock()
-		msg := guestbookMessage
-		guestbookMutex.RUnlock()
+		msg, err := queries.GetMessage(r.Context())
+		if err != nil {
+			if err == sql.ErrNoRows {
+				msg = "Hello! Welcome to the guestbook."
+			} else {
+				http.Error(w, "Database error", http.StatusInternalServerError)
+				return
+			}
+		}
 		views.Guestbook(msg).Render(r.Context(), w)
 	})
 
@@ -47,9 +82,11 @@ func main() {
 			http.Error(w, "Invalid request", http.StatusBadRequest)
 			return
 		}
-		guestbookMutex.Lock()
-		guestbookMessage = r.FormValue("message")
-		guestbookMutex.Unlock()
+		message := r.FormValue("message")
+		if err := queries.UpsertMessage(r.Context(), message); err != nil {
+			http.Error(w, "Database error", http.StatusInternalServerError)
+			return
+		}
 		http.Redirect(w, r, "/guestbook", http.StatusSeeOther)
 	})
 
@@ -73,7 +110,7 @@ func main() {
 
 	// Start the server
 	fmt.Printf("Server starting on port %s...\n", port)
-	err := http.ListenAndServe(":"+port, r)
+	err = http.ListenAndServe(":"+port, r)
 	if err != nil {
 		fmt.Printf("Error starting server: %s\n", err)
 	}

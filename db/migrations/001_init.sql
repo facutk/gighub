@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS guestbook (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  message TEXT NOT NULL
+);
