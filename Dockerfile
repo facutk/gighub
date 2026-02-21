@@ -15,7 +15,7 @@ COPY . .
 RUN npx tailwindcss -i ./assets/css/input.css -o ./assets/css/styles.css --minify
 
 # Stage 2: Backend builder for Go binary
-FROM golang:1.23-alpine3.20 AS backend-builder
+FROM golang:1.24-alpine AS backend-builder
 
 # Install templ tool
 RUN go install github.com/a-h/templ/cmd/templ@latest
