@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"embed"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 
@@ -32,22 +33,19 @@ func main() {
 	// Initialize Database
 	dbConn, err := sql.Open("sqlite", "data/gighub.db")
 	if err != nil {
-		fmt.Printf("Error opening database: %s\n", err)
-		os.Exit(1)
+		log.Fatalf("Error opening database: %s", err)
 	}
 	defer dbConn.Close()
 
 	// Run migrations
 	entries, err := migrationsFS.ReadDir("db/migrations")
 	if err != nil {
-		fmt.Printf("Error reading migrations: %s\n", err)
-		os.Exit(1)
+		log.Fatalf("Error reading migrations: %s", err)
 	}
 	for _, entry := range entries {
 		content, _ := migrationsFS.ReadFile("db/migrations/" + entry.Name())
 		if _, err := dbConn.Exec(string(content)); err != nil {
-			fmt.Printf("Error running migration %s: %s\n", entry.Name(), err)
-			os.Exit(1)
+			log.Fatalf("Error running migration %s: %s", entry.Name(), err)
 		}
 	}
 

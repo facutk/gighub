@@ -64,6 +64,9 @@ COPY --from=backend-builder /app/gighub .
 # Copy the assets directory (which now contains the compiled CSS)
 COPY --from=backend-builder /app/assets ./assets
 
+# Create data directory to ensure it exists
+RUN mkdir data
+
 # Set proper permissions
 RUN chown -R appuser:appuser /app
 

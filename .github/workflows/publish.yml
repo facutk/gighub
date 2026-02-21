@@ -62,11 +62,15 @@ jobs:
             FULL_IMAGE="${{ env.REGISTRY }}/$IMAGE_NAME:${{ github.sha }}"
 
             # Login to GHCR
-            # echo "${{ secrets.GITHUB_TOKEN }}" | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
             
             # Pull new image BEFORE stopping the old one to minimize downtime
             docker pull $FULL_IMAGE
             
+            # Ensure data directory exists and has correct permissions for appuser (UID 1000)
+            mkdir -p data
+            sudo chown -R 1000:1000 data
+
             # Restart container
             docker stop gighub || true
             docker rm gighub || true
