@@ -30,11 +30,6 @@ func main() {
 	r.Use(middleware.Recoverer)
 
 	// Initialize Database
-	if err := os.MkdirAll("data", 0755); err != nil {
-		fmt.Printf("Error creating data directory: %s\n", err)
-		os.Exit(1)
-	}
-
 	dbConn, err := sql.Open("sqlite", "data/gighub.db")
 	if err != nil {
 		fmt.Printf("Error opening database: %s\n", err)
