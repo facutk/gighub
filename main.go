@@ -82,13 +82,14 @@ func main() {
 		Password: os.Getenv("SQLITEADMIN_PASSWORD"),
 	}
 	admin := sqliteadmin.New(adminConfig)
-	r.Route("/admin", func(r chi.Router) {
+	r.Group(func(r chi.Router) {
 		r.Use(cors.Handler(cors.Options{
 			AllowedOrigins: []string{"*"},
 			AllowedMethods: []string{"POST", "OPTIONS"},
 			AllowedHeaders: []string{"Content-Type", "Authorization"},
 		}))
-		r.Post("/", admin.HandlePost)
+		r.Post("/admin", admin.HandlePost)
+		r.Options("/admin", func(w http.ResponseWriter, r *http.Request) {})
 	})
 
 	// Guestbook routes
