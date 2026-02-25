@@ -15,6 +15,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
+	"github.com/joelseq/sqliteadmin-go"
+	"github.com/joho/godotenv"
 	_ "modernc.org/sqlite"
 )
 
@@ -22,6 +25,11 @@ import (
 var migrationsFS embed.FS
 
 func main() {
+	// Load .env file
+	if err := godotenv.Load(); err != nil {
+		log.Println("No .env file found")
+	}
+
 	// Initialize the router
 	r := chi.NewRouter()
 
@@ -66,6 +74,19 @@ func main() {
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		views.Home().Render(r.Context(), w)
 	})
+
+	// Admin dashboard
+	adminConfig := sqliteadmin.Config{
+		DB:       dbConn,
+		Username: os.Getenv("SQLITEADMIN_USERNAME"),
+		Password: os.Getenv("SQLITEADMIN_PASSWORD"),
+	}
+	admin := sqliteadmin.New(adminConfig)
+	r.With(cors.Handler(cors.Options{
+		AllowedOrigins: []string{"*"},
+		AllowedMethods: []string{"POST", "OPTIONS"},
+		AllowedHeaders: []string{"Content-Type", "Authorization"},
+	})).Post("/admin", admin.HandlePost)
 
 	// Guestbook routes
 	r.Get("/guestbook", func(w http.ResponseWriter, r *http.Request) {
