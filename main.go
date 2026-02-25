@@ -15,7 +15,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/go-chi/cors"
 	"github.com/joelseq/sqliteadmin-go"
 	"github.com/joho/godotenv"
 	_ "modernc.org/sqlite"
@@ -82,14 +81,15 @@ func main() {
 		Password: os.Getenv("SQLITEADMIN_PASSWORD"),
 	}
 	admin := sqliteadmin.New(adminConfig)
-	r.Group(func(r chi.Router) {
-		r.Use(cors.Handler(cors.Options{
-			AllowedOrigins: []string{"*"},
-			AllowedMethods: []string{"POST", "OPTIONS"},
-			AllowedHeaders: []string{"Content-Type", "Authorization"},
-		}))
-		r.Post("/admin", admin.HandlePost)
-		r.Options("/admin", func(w http.ResponseWriter, r *http.Request) {})
+	r.Options("/admin", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.WriteHeader(http.StatusOK)
+	})
+	r.Post("/admin", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		admin.HandlePost(w, r)
 	})
 
 	// Guestbook routes
