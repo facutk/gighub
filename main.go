@@ -6,8 +6,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/smtp"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 
 	"gighub/db"
 	"gighub/utils"
@@ -55,15 +58,53 @@ func main() {
 	}
 	defer dbConn.Close()
 
+	// Initialize migration tracking
+	if _, err := dbConn.Exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
+		version INTEGER PRIMARY KEY,
+		applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);`); err != nil {
+		log.Fatalf("Error creating schema_migrations: %s", err)
+	}
+
+	var currentVersion int
+	if err := dbConn.QueryRow("SELECT COALESCE(MAX(version), 0) FROM schema_migrations").Scan(&currentVersion); err != nil {
+		log.Fatalf("Error getting current version: %s", err)
+	}
+
 	// Run migrations
 	entries, err := migrationsFS.ReadDir("db/migrations")
 	if err != nil {
 		log.Fatalf("Error reading migrations: %s", err)
 	}
 	for _, entry := range entries {
-		content, _ := migrationsFS.ReadFile("db/migrations/" + entry.Name())
-		if _, err := dbConn.Exec(string(content)); err != nil {
-			log.Fatalf("Error running migration %s: %s", entry.Name(), err)
+		parts := strings.Split(entry.Name(), "_")
+		if len(parts) == 0 {
+			continue
+		}
+		version, err := strconv.Atoi(parts[0])
+		if err != nil {
+			continue
+		}
+
+		if version > currentVersion {
+			fmt.Printf("Running migration %s...\n", entry.Name())
+			content, _ := migrationsFS.ReadFile("db/migrations/" + entry.Name())
+
+			tx, err := dbConn.Begin()
+			if err != nil {
+				log.Fatalf("Error starting transaction: %s", err)
+			}
+			if _, err := tx.Exec(string(content)); err != nil {
+				tx.Rollback()
+				log.Fatalf("Error running migration %s: %s", entry.Name(), err)
+			}
+			if _, err := tx.Exec("INSERT INTO schema_migrations (version) VALUES (?)", version); err != nil {
+				tx.Rollback()
+				log.Fatalf("Error updating schema_migrations: %s", err)
+			}
+			if err := tx.Commit(); err != nil {
+				log.Fatalf("Error committing transaction: %s", err)
+			}
 		}
 	}
 
@@ -117,6 +158,30 @@ func main() {
 			return
 		}
 		http.Redirect(w, r, "/guestbook", http.StatusSeeOther)
+	})
+
+	// Email test route
+	r.Get("/email", func(w http.ResponseWriter, r *http.Request) {
+		host := os.Getenv("SMTP_HOST")
+		port := os.Getenv("SMTP_PORT")
+		user := os.Getenv("SMTP_USER")
+		pass := os.Getenv("SMTP_PASS")
+		from := os.Getenv("SMTP_FROM")
+		to := r.URL.Query().Get("to")
+
+		if host == "" || port == "" || user == "" || pass == "" || from == "" {
+			http.Error(w, "SMTP environment variables are not set", http.StatusInternalServerError)
+			return
+		}
+
+		auth := smtp.PlainAuth("", user, pass, host)
+		msg := []byte(fmt.Sprintf("To: %s\r\nSubject: Test Email\r\n\r\nThis is a test email from your Go app.", to))
+
+		if err := smtp.SendMail(host+":"+port, auth, from, []string{to}, msg); err != nil {
+			http.Error(w, "Failed to send email: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Write([]byte("Email sent successfully to " + to))
 	})
 
 	// Route to display the application version (Git SHA)

@@ -7,7 +7,56 @@ package db
 
 import (
 	"context"
+	"time"
 )
+
+const createSession = `-- name: CreateSession :exec
+INSERT INTO sessions (token_hash, user_id, expiry)
+VALUES (?, ?, ?)
+`
+
+type CreateSessionParams struct {
+	TokenHash string
+	UserID    int64
+	Expiry    time.Time
+}
+
+func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) error {
+	_, err := q.db.ExecContext(ctx, createSession, arg.TokenHash, arg.UserID, arg.Expiry)
+	return err
+}
+
+const createUser = `-- name: CreateUser :one
+INSERT INTO users (email, password_hash)
+VALUES (?, ?)
+RETURNING id, email, password_hash, created_at
+`
+
+type CreateUserParams struct {
+	Email        string
+	PasswordHash string
+}
+
+func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
+	row := q.db.QueryRowContext(ctx, createUser, arg.Email, arg.PasswordHash)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.PasswordHash,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const deleteSession = `-- name: DeleteSession :exec
+DELETE FROM sessions WHERE token_hash = ?
+`
+
+func (q *Queries) DeleteSession(ctx context.Context, tokenHash string) error {
+	_, err := q.db.ExecContext(ctx, deleteSession, tokenHash)
+	return err
+}
 
 const getMessage = `-- name: GetMessage :one
 SELECT message FROM guestbook WHERE id = 1 LIMIT 1
@@ -18,6 +67,47 @@ func (q *Queries) GetMessage(ctx context.Context) (string, error) {
 	var message string
 	err := row.Scan(&message)
 	return message, err
+}
+
+const getSession = `-- name: GetSession :one
+SELECT sessions.token_hash, sessions.user_id, sessions.expiry, users.email FROM sessions
+JOIN users ON sessions.user_id = users.id
+WHERE token_hash = ? AND expiry > CURRENT_TIMESTAMP LIMIT 1
+`
+
+type GetSessionRow struct {
+	TokenHash string
+	UserID    int64
+	Expiry    time.Time
+	Email     string
+}
+
+func (q *Queries) GetSession(ctx context.Context, tokenHash string) (GetSessionRow, error) {
+	row := q.db.QueryRowContext(ctx, getSession, tokenHash)
+	var i GetSessionRow
+	err := row.Scan(
+		&i.TokenHash,
+		&i.UserID,
+		&i.Expiry,
+		&i.Email,
+	)
+	return i, err
+}
+
+const getUserByEmail = `-- name: GetUserByEmail :one
+SELECT id, email, password_hash, created_at FROM users WHERE email = ? LIMIT 1
+`
+
+func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
+	row := q.db.QueryRowContext(ctx, getUserByEmail, email)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.PasswordHash,
+		&i.CreatedAt,
+	)
+	return i, err
 }
 
 const upsertMessage = `-- name: UpsertMessage :exec

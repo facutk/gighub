@@ -4,7 +4,31 @@
 
 package db
 
+import (
+	"database/sql"
+	"time"
+)
+
 type Guestbook struct {
 	ID      int64
 	Message string
+}
+
+type PasswordResetToken struct {
+	TokenHash string
+	UserID    int64
+	Expiry    time.Time
+}
+
+type Session struct {
+	TokenHash string
+	UserID    int64
+	Expiry    time.Time
+}
+
+type User struct {
+	ID           int64
+	Email        string
+	PasswordHash string
+	CreatedAt    sql.NullTime
 }
