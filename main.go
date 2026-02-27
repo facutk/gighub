@@ -2,15 +2,11 @@ package main
 
 import (
 	"database/sql"
-	"embed"
 	"fmt"
 	"log"
 	"net/http"
 	"net/smtp"
 	"os"
-	"path/filepath"
-	"strconv"
-	"strings"
 
 	"gighub/db"
 	"gighub/utils"
@@ -20,11 +16,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/joelseq/sqliteadmin-go"
 	"github.com/joho/godotenv"
-	_ "modernc.org/sqlite"
 )
-
-//go:embed db/migrations/*.sql
-var migrationsFS embed.FS
 
 func main() {
 	// Load .env file
@@ -41,74 +33,11 @@ func main() {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
-	dataDir := "data"
-	// Check if the data directory is writable by creating a temporary file.
-	// This provides a clearer error message than the cryptic SQLite one.
-	tmpFile, err := os.Create(filepath.Join(dataDir, ".writable"))
+	dbConn, queries, err := db.Setup("data", "gighub.db")
 	if err != nil {
-		log.Fatalf("Error: The data directory ('%s') is not writable. Please check permissions. Original error: %s", dataDir, err)
-	}
-	tmpFile.Close()
-	os.Remove(tmpFile.Name())
-
-	// Initialize Database
-	dbConn, err := sql.Open("sqlite", filepath.Join(dataDir, "gighub.db"))
-	if err != nil {
-		log.Fatalf("Error opening database: %s", err)
+		log.Fatal(err)
 	}
 	defer dbConn.Close()
-
-	// Initialize migration tracking
-	if _, err := dbConn.Exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
-		version INTEGER PRIMARY KEY,
-		applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
-	);`); err != nil {
-		log.Fatalf("Error creating schema_migrations: %s", err)
-	}
-
-	var currentVersion int
-	if err := dbConn.QueryRow("SELECT COALESCE(MAX(version), 0) FROM schema_migrations").Scan(&currentVersion); err != nil {
-		log.Fatalf("Error getting current version: %s", err)
-	}
-
-	// Run migrations
-	entries, err := migrationsFS.ReadDir("db/migrations")
-	if err != nil {
-		log.Fatalf("Error reading migrations: %s", err)
-	}
-	for _, entry := range entries {
-		parts := strings.Split(entry.Name(), "_")
-		if len(parts) == 0 {
-			continue
-		}
-		version, err := strconv.Atoi(parts[0])
-		if err != nil {
-			continue
-		}
-
-		if version > currentVersion {
-			fmt.Printf("Running migration %s...\n", entry.Name())
-			content, _ := migrationsFS.ReadFile("db/migrations/" + entry.Name())
-
-			tx, err := dbConn.Begin()
-			if err != nil {
-				log.Fatalf("Error starting transaction: %s", err)
-			}
-			if _, err := tx.Exec(string(content)); err != nil {
-				tx.Rollback()
-				log.Fatalf("Error running migration %s: %s", entry.Name(), err)
-			}
-			if _, err := tx.Exec("INSERT INTO schema_migrations (version) VALUES (?)", version); err != nil {
-				tx.Rollback()
-				log.Fatalf("Error updating schema_migrations: %s", err)
-			}
-			if err := tx.Commit(); err != nil {
-				log.Fatalf("Error committing transaction: %s", err)
-			}
-		}
-	}
-
-	queries := db.New(dbConn)
 
 	// Define the route
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
