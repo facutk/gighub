@@ -27,8 +27,10 @@ type Session struct {
 }
 
 type User struct {
-	ID           int64
-	Email        string
-	PasswordHash string
-	CreatedAt    sql.NullTime
+	ID                int64
+	Email             string
+	PasswordHash      string
+	CreatedAt         sql.NullTime
+	VerificationToken sql.NullString
+	VerifiedAt        sql.NullTime
 }

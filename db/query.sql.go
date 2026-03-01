@@ -7,6 +7,7 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"time"
 )
 
@@ -27,24 +28,27 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) er
 }
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (email, password_hash)
-VALUES (?, ?)
-RETURNING id, email, password_hash, created_at
+INSERT INTO users (email, password_hash, verification_token)
+VALUES (?, ?, ?)
+RETURNING id, email, password_hash, created_at, verification_token, verified_at
 `
 
 type CreateUserParams struct {
-	Email        string
-	PasswordHash string
+	Email             string
+	PasswordHash      string
+	VerificationToken sql.NullString
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
-	row := q.db.QueryRowContext(ctx, createUser, arg.Email, arg.PasswordHash)
+	row := q.db.QueryRowContext(ctx, createUser, arg.Email, arg.PasswordHash, arg.VerificationToken)
 	var i User
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
 		&i.PasswordHash,
 		&i.CreatedAt,
+		&i.VerificationToken,
+		&i.VerifiedAt,
 	)
 	return i, err
 }
@@ -95,7 +99,7 @@ func (q *Queries) GetSession(ctx context.Context, tokenHash string) (GetSessionR
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, password_hash, created_at FROM users WHERE email = ? LIMIT 1
+SELECT id, email, password_hash, created_at, verification_token, verified_at FROM users WHERE email = ? LIMIT 1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -106,6 +110,8 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.Email,
 		&i.PasswordHash,
 		&i.CreatedAt,
+		&i.VerificationToken,
+		&i.VerifiedAt,
 	)
 	return i, err
 }
@@ -119,4 +125,18 @@ ON CONFLICT(id) DO UPDATE SET message = excluded.message
 func (q *Queries) UpsertMessage(ctx context.Context, message string) error {
 	_, err := q.db.ExecContext(ctx, upsertMessage, message)
 	return err
+}
+
+const verifyUser = `-- name: VerifyUser :one
+UPDATE users 
+SET verified_at = CURRENT_TIMESTAMP, verification_token = NULL
+WHERE verification_token = ? AND verified_at IS NULL
+RETURNING id
+`
+
+func (q *Queries) VerifyUser(ctx context.Context, verificationToken sql.NullString) (int64, error) {
+	row := q.db.QueryRowContext(ctx, verifyUser, verificationToken)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
 }

@@ -7,8 +7,8 @@ VALUES (1, ?)
 ON CONFLICT(id) DO UPDATE SET message = excluded.message;
 
 -- name: CreateUser :one
-INSERT INTO users (email, password_hash)
-VALUES (?, ?)
+INSERT INTO users (email, password_hash, verification_token)
+VALUES (?, ?, ?)
 RETURNING *;
 
 -- name: GetUserByEmail :one
@@ -25,3 +25,9 @@ WHERE token_hash = ? AND expiry > CURRENT_TIMESTAMP LIMIT 1;
 
 -- name: DeleteSession :exec
 DELETE FROM sessions WHERE token_hash = ?;
+
+-- name: VerifyUser :one
+UPDATE users 
+SET verified_at = CURRENT_TIMESTAMP, verification_token = NULL
+WHERE verification_token = ? AND verified_at IS NULL
+RETURNING id;

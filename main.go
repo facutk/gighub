@@ -1,7 +1,9 @@
 package main
 
 import (
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"net/http"
@@ -16,6 +18,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/joelseq/sqliteadmin-go"
 	"github.com/joho/godotenv"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func main() {
@@ -91,26 +94,87 @@ func main() {
 
 	// Email test route
 	r.Get("/email", func(w http.ResponseWriter, r *http.Request) {
-		host := os.Getenv("SMTP_HOST")
-		port := os.Getenv("SMTP_PORT")
-		user := os.Getenv("SMTP_USER")
-		pass := os.Getenv("SMTP_PASS")
-		from := os.Getenv("SMTP_FROM")
 		to := r.URL.Query().Get("to")
-
-		if host == "" || port == "" || user == "" || pass == "" || from == "" {
-			http.Error(w, "SMTP environment variables are not set", http.StatusInternalServerError)
-			return
-		}
-
-		auth := smtp.PlainAuth("", user, pass, host)
-		msg := []byte(fmt.Sprintf("To: %s\r\nSubject: Test Email\r\n\r\nThis is a test email from your Go app.", to))
-
-		if err := smtp.SendMail(host+":"+port, auth, from, []string{to}, msg); err != nil {
+		if err := sendEmail(to, "Test Email", "This is a test email from your Go app."); err != nil {
 			http.Error(w, "Failed to send email: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 		w.Write([]byte("Email sent successfully to " + to))
+	})
+
+	// Auth routes
+	r.Get("/signup", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		w.Write([]byte(`
+			<h1>Sign Up</h1>
+			<form action="/signup" method="post">
+				<label>Email: <input type="email" name="email" required></label><br>
+				<label>Password: <input type="password" name="password" required></label><br>
+				<button type="submit">Sign Up</button>
+			</form>
+		`))
+	})
+
+	r.Post("/signup", func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "Invalid request", http.StatusBadRequest)
+			return
+		}
+		email := r.FormValue("email")
+		password := r.FormValue("password")
+
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		if err != nil {
+			http.Error(w, "Server error", http.StatusInternalServerError)
+			return
+		}
+
+		// Generate verification token
+		tokenBytes := make([]byte, 16)
+		rand.Read(tokenBytes)
+		token := hex.EncodeToString(tokenBytes)
+
+		if _, err := queries.CreateUser(r.Context(), db.CreateUserParams{
+			Email:             email,
+			PasswordHash:      string(hashedPassword),
+			VerificationToken: sql.NullString{String: token, Valid: true},
+		}); err != nil {
+			log.Printf("Error creating user: %v", err)
+			http.Error(w, "Error creating user", http.StatusInternalServerError)
+			return
+		}
+
+		// Send verification email asynchronously
+		go func() {
+			baseURL := os.Getenv("BASE_URL")
+			link := fmt.Sprintf("%s/verify?token=%s", baseURL, token)
+			if err := sendEmail(email, "Verify your email", "Please verify your email by clicking here: "+link); err != nil {
+				log.Printf("Failed to send welcome email: %v", err)
+			}
+		}()
+
+		w.Write([]byte("User created! Please check your email to verify your account."))
+	})
+
+	r.Get("/verify", func(w http.ResponseWriter, r *http.Request) {
+		token := r.URL.Query().Get("token")
+		if token == "" {
+			http.Error(w, "Missing token", http.StatusBadRequest)
+			return
+		}
+
+		_, err := queries.VerifyUser(r.Context(), sql.NullString{String: token, Valid: true})
+		if err != nil {
+			if err == sql.ErrNoRows {
+				http.Error(w, "Invalid or expired token", http.StatusBadRequest)
+			} else {
+				log.Printf("Verification error: %v", err)
+				http.Error(w, "Server error", http.StatusInternalServerError)
+			}
+			return
+		}
+
+		w.Write([]byte("Email verified successfully! You can now login."))
 	})
 
 	// Route to display the application version (Git SHA)
@@ -137,4 +201,21 @@ func main() {
 	if err != nil {
 		fmt.Printf("Error starting server: %s\n", err)
 	}
+}
+
+func sendEmail(to, subject, body string) error {
+	host := os.Getenv("SMTP_HOST")
+	port := os.Getenv("SMTP_PORT")
+	user := os.Getenv("SMTP_USER")
+	pass := os.Getenv("SMTP_PASS")
+	from := os.Getenv("SMTP_FROM")
+
+	if host == "" || port == "" || user == "" || pass == "" || from == "" {
+		return fmt.Errorf("SMTP environment variables are not set")
+	}
+
+	auth := smtp.PlainAuth("", user, pass, host)
+	msg := []byte(fmt.Sprintf("To: %s\r\nSubject: %s\r\n\r\n%s", to, subject, body))
+
+	return smtp.SendMail(host+":"+port, auth, from, []string{to}, msg)
 }
