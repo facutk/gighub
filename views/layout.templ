@@ -1,5 +1,14 @@
 package views
 
+import "context"
+
+func isAuth(ctx context.Context) bool {
+	if val, ok := ctx.Value("isLoggedIn").(bool); ok {
+		return val
+	}
+	return false
+}
+
 templ Layout(title string) {
 	<html lang="en">
 		<head>
@@ -21,10 +30,18 @@ templ Layout(title string) {
 							</a>
 						</div>
 						<div class="flex items-center">
-							<a href="/login" class="text-gray-500 hover:text-gray-700 hover:bg-gray-200 px-3 py-2 rounded-md text-sm font-semibold border border-transparent">Log in</a>
-							<a href="/signup" class="ml-4 inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-pink-500 hover:bg-pink-600">
-								Sign up
-							</a>
+							if isAuth(ctx) {
+								<a href="/account" class="text-gray-500 hover:text-gray-700 hover:bg-gray-200 px-3 py-2 rounded-md text-sm font-semibold border border-transparent flex items-center gap-2" aria-label="My Account">
+									<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+									</svg>
+								</a>
+							} else {
+								<a href="/login" class="text-gray-500 hover:text-gray-700 hover:bg-gray-200 px-3 py-2 rounded-md text-sm font-semibold border border-transparent">Log in</a>
+								<a href="/signup" class="ml-4 inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-pink-500 hover:bg-pink-600">
+									Sign up
+								</a>
+							}
 						</div>
 					</div>
 				</div>

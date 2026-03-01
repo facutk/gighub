@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
@@ -82,6 +83,12 @@ func main() {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(sessionManager.LoadAndSave)
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := context.WithValue(r.Context(), "isLoggedIn", sessionManager.Exists(r.Context(), "userID"))
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	})
 
 	dbConn, queries, err := db.Setup("data", "gighub.db")
 	if err != nil {
@@ -223,9 +230,8 @@ func main() {
 			http.Error(w, "Server error", http.StatusInternalServerError)
 			return
 		}
-		log.Printf("Logging in user ID: %d", user.ID)
 		sessionManager.Put(r.Context(), "userID", user.ID)
-		http.Redirect(w, r, "/guestbook", http.StatusSeeOther)
+		http.Redirect(w, r, "/", http.StatusSeeOther)
 	})
 
 	// Auth routes
