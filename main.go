@@ -86,8 +86,8 @@ func main() {
 	})
 
 	// Static pages
-	r.Get("/privacy", func(w http.ResponseWriter, r *http.Request) {
-		views.Privacy().Render(r.Context(), w)
+	r.Get("/privacy-policy", func(w http.ResponseWriter, r *http.Request) {
+		views.PrivacyPolicy().Render(r.Context(), w)
 	})
 
 	r.Get("/terms", func(w http.ResponseWriter, r *http.Request) {
