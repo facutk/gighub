@@ -18,6 +18,7 @@ import (
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/gorilla/sessions"
 	"github.com/joelseq/sqliteadmin-go"
 	"github.com/joho/godotenv"
 	"github.com/justinas/nosurf"
@@ -63,6 +64,14 @@ func main() {
 		}
 		return provider, nil
 	}
+
+	// Configure Gothic session store
+	store := sessions.NewCookieStore([]byte(os.Getenv("SESSION_SECRET")))
+	store.MaxAge(86400 * 30)
+	store.Options.Path = "/"
+	store.Options.HttpOnly = true
+	store.Options.Secure = os.Getenv("ENV") == "production"
+	gothic.Store = store
 
 	// Initialize the router
 	r := chi.NewRouter()
