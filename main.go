@@ -21,6 +21,9 @@ import (
 	"github.com/joelseq/sqliteadmin-go"
 	"github.com/joho/godotenv"
 	"github.com/justinas/nosurf"
+	"github.com/markbates/goth"
+	"github.com/markbates/goth/gothic"
+	"github.com/markbates/goth/providers/google"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -49,6 +52,18 @@ func main() {
 	sessionManager.Cookie.SameSite = http.SameSiteLaxMode
 	sessionManager.Cookie.Secure = os.Getenv("ENV") == "production"
 
+	// Configure Goth for Social Login
+	goth.UseProviders(
+		google.New(os.Getenv("GOOGLE_CLIENT_ID"), os.Getenv("GOOGLE_CLIENT_SECRET"), os.Getenv("BASE_URL")+"/auth/google/callback"),
+	)
+	gothic.GetProviderName = func(req *http.Request) (string, error) {
+		provider := chi.URLParam(req, "provider")
+		if provider == "" {
+			return "", fmt.Errorf("provider not found")
+		}
+		return provider, nil
+	}
+
 	// Initialize the router
 	r := chi.NewRouter()
 
@@ -68,6 +83,15 @@ func main() {
 	// Define the route
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		views.Home().Render(r.Context(), w)
+	})
+
+	// Static pages
+	r.Get("/privacy", func(w http.ResponseWriter, r *http.Request) {
+		views.Privacy().Render(r.Context(), w)
+	})
+
+	r.Get("/terms", func(w http.ResponseWriter, r *http.Request) {
+		views.Terms().Render(r.Context(), w)
 	})
 
 	// Admin dashboard
@@ -126,6 +150,61 @@ func main() {
 			return
 		}
 		w.Write([]byte("Email sent successfully to " + to))
+	})
+
+	// Social Auth Routes
+	r.Get("/auth/{provider}", func(w http.ResponseWriter, r *http.Request) {
+		gothic.BeginAuthHandler(w, r)
+	})
+
+	r.Get("/auth/{provider}/callback", func(w http.ResponseWriter, r *http.Request) {
+		gUser, err := gothic.CompleteUserAuth(w, r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Check if user exists
+		user, err := queries.GetUserByEmail(r.Context(), gUser.Email)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				// Create new user with random password and token
+				pwBytes := make([]byte, 32)
+				rand.Read(pwBytes)
+				pwHash, _ := bcrypt.GenerateFromPassword(pwBytes, bcrypt.DefaultCost)
+
+				tokenBytes := make([]byte, 16)
+				rand.Read(tokenBytes)
+				token := hex.EncodeToString(tokenBytes)
+
+				user, err = queries.CreateUser(r.Context(), db.CreateUserParams{
+					Email:             gUser.Email,
+					PasswordHash:      string(pwHash),
+					VerificationToken: sql.NullString{String: token, Valid: true},
+				})
+				if err != nil {
+					http.Error(w, "Failed to create user", http.StatusInternalServerError)
+					return
+				}
+
+				// Mark as verified immediately since it's Google
+				queries.VerifyUser(r.Context(), sql.NullString{String: token, Valid: true})
+			} else {
+				http.Error(w, "Database error", http.StatusInternalServerError)
+				return
+			}
+		} else if !user.VerifiedAt.Valid {
+			// If user exists but wasn't verified, verify them now since we trust Google
+			queries.VerifyUser(r.Context(), user.VerificationToken)
+		}
+
+		// Log the user in
+		if err := sessionManager.RenewToken(r.Context()); err != nil {
+			http.Error(w, "Server error", http.StatusInternalServerError)
+			return
+		}
+		sessionManager.Put(r.Context(), "userID", user.ID)
+		http.Redirect(w, r, "/guestbook", http.StatusSeeOther)
 	})
 
 	// Auth routes
@@ -194,6 +273,8 @@ func main() {
 				<label>Password: <input type="password" name="password" required></label><br>
 				<button type="submit">Login</button>
 			</form>
+			<hr>
+			<a href="/auth/google">Login with Google</a>
 		`, nosurf.Token(r))))
 	})
 

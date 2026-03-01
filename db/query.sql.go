@@ -99,20 +99,20 @@ func (q *Queries) GetSession(ctx context.Context, tokenHash string) (GetSessionR
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, password_hash, verified_at FROM users
-WHERE email = ?
+SELECT id, email, password_hash, created_at, verification_token, verified_at FROM users WHERE email = ?
 `
 
-type GetUserByEmailRow struct {
-	ID           int64
-	PasswordHash string
-	VerifiedAt   sql.NullTime
-}
-
-func (q *Queries) GetUserByEmail(ctx context.Context, email string) (GetUserByEmailRow, error) {
+func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
 	row := q.db.QueryRowContext(ctx, getUserByEmail, email)
-	var i GetUserByEmailRow
-	err := row.Scan(&i.ID, &i.PasswordHash, &i.VerifiedAt)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.PasswordHash,
+		&i.CreatedAt,
+		&i.VerificationToken,
+		&i.VerifiedAt,
+	)
 	return i, err
 }
 

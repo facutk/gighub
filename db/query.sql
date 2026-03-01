@@ -12,8 +12,7 @@ VALUES (?, ?, ?)
 RETURNING *;
 
 -- name: GetUserByEmail :one
-SELECT id, password_hash, verified_at FROM users
-WHERE email = ?;
+SELECT * FROM users WHERE email = ?;
 
 -- name: CreateSession :exec
 INSERT INTO sessions (token_hash, user_id, expiry)
