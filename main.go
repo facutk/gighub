@@ -237,17 +237,7 @@ func main() {
 
 	// Auth routes
 	r.Get("/signup", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html")
-		// Pass the CSRF token to the form
-		w.Write([]byte(fmt.Sprintf(`
-			<h1>Sign Up</h1>
-			<form action="/signup" method="post">
-				<input type="hidden" name="csrf_token" value="%s">
-				<label>Email: <input type="email" name="email" required></label><br>
-				<label>Password: <input type="password" name="password" required></label><br>
-				<button type="submit">Sign Up</button>
-			</form>
-		`, nosurf.Token(r))))
+		views.Signup().Render(r.Context(), w)
 	})
 
 	r.Post("/signup", func(w http.ResponseWriter, r *http.Request) {
