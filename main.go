@@ -9,11 +9,13 @@ import (
 	"net/http"
 	"net/smtp"
 	"os"
+	"time"
 
 	"gighub/db"
 	"gighub/utils"
 	"gighub/views"
 
+	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/joelseq/sqliteadmin-go"
@@ -22,11 +24,30 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+var sessionManager *scs.SessionManager
+
+func requireAuth(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !sessionManager.Exists(r.Context(), "userID") {
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func main() {
 	// Load .env file
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found")
 	}
+
+	// Initialize session manager
+	sessionManager = scs.New()
+	sessionManager.Lifetime = 24 * time.Hour
+	sessionManager.Cookie.Persist = true
+	sessionManager.Cookie.SameSite = http.SameSiteLaxMode
+	sessionManager.Cookie.Secure = os.Getenv("ENV") == "production"
 
 	// Initialize the router
 	r := chi.NewRouter()
@@ -36,6 +57,7 @@ func main() {
 	// Recoverer: Recovers from panics and returns a 500 error instead of crashing
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+	r.Use(sessionManager.LoadAndSave)
 
 	dbConn, queries, err := db.Setup("data", "gighub.db")
 	if err != nil {
@@ -67,30 +89,33 @@ func main() {
 	})
 
 	// Guestbook routes
-	r.Get("/guestbook", func(w http.ResponseWriter, r *http.Request) {
-		msg, err := queries.GetMessage(r.Context())
-		if err != nil {
-			if err == sql.ErrNoRows {
-				msg = "Hello! Welcome to the guestbook."
-			} else {
+	r.Group(func(r chi.Router) {
+		r.Use(requireAuth)
+		r.Get("/guestbook", func(w http.ResponseWriter, r *http.Request) {
+			msg, err := queries.GetMessage(r.Context())
+			if err != nil {
+				if err == sql.ErrNoRows {
+					msg = "Hello! Welcome to the guestbook."
+				} else {
+					http.Error(w, "Database error", http.StatusInternalServerError)
+					return
+				}
+			}
+			views.Guestbook(msg, nosurf.Token(r)).Render(r.Context(), w)
+		})
+
+		r.Post("/guestbook", func(w http.ResponseWriter, r *http.Request) {
+			if err := r.ParseForm(); err != nil {
+				http.Error(w, "Invalid request", http.StatusBadRequest)
+				return
+			}
+			message := r.FormValue("message")
+			if err := queries.UpsertMessage(r.Context(), message); err != nil {
 				http.Error(w, "Database error", http.StatusInternalServerError)
 				return
 			}
-		}
-		views.Guestbook(msg, nosurf.Token(r)).Render(r.Context(), w)
-	})
-
-	r.Post("/guestbook", func(w http.ResponseWriter, r *http.Request) {
-		if err := r.ParseForm(); err != nil {
-			http.Error(w, "Invalid request", http.StatusBadRequest)
-			return
-		}
-		message := r.FormValue("message")
-		if err := queries.UpsertMessage(r.Context(), message); err != nil {
-			http.Error(w, "Database error", http.StatusInternalServerError)
-			return
-		}
-		http.Redirect(w, r, "/guestbook", http.StatusSeeOther)
+			http.Redirect(w, r, "/guestbook", http.StatusSeeOther)
+		})
 	})
 
 	// Email test route
@@ -157,6 +182,67 @@ func main() {
 		}()
 
 		w.Write([]byte("User created! Please check your email to verify your account."))
+	})
+
+	r.Get("/login", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		w.Write([]byte(fmt.Sprintf(`
+			<h1>Login</h1>
+			<form action="/login" method="post">
+				<input type="hidden" name="csrf_token" value="%s">
+				<label>Email: <input type="email" name="email" required></label><br>
+				<label>Password: <input type="password" name="password" required></label><br>
+				<button type="submit">Login</button>
+			</form>
+		`, nosurf.Token(r))))
+	})
+
+	r.Post("/login", func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "Invalid request", http.StatusBadRequest)
+			return
+		}
+		email := r.FormValue("email")
+		password := r.FormValue("password")
+
+		user, err := queries.GetUserByEmail(r.Context(), email)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				http.Error(w, "Invalid email or password", http.StatusUnauthorized)
+			} else {
+				http.Error(w, "Database error", http.StatusInternalServerError)
+			}
+			return
+		}
+
+		if !user.VerifiedAt.Valid {
+			http.Error(w, "Please verify your email before logging in.", http.StatusUnauthorized)
+			return
+		}
+
+		err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password))
+		if err != nil {
+			http.Error(w, "Invalid email or password", http.StatusUnauthorized)
+			return
+		}
+
+		// Login successful
+		if err := sessionManager.RenewToken(r.Context()); err != nil {
+			http.Error(w, "Server error", http.StatusInternalServerError)
+			return
+		}
+		sessionManager.Put(r.Context(), "userID", user.ID)
+
+		http.Redirect(w, r, "/guestbook", http.StatusSeeOther)
+	})
+
+	r.Get("/logout", func(w http.ResponseWriter, r *http.Request) {
+		if err := sessionManager.Destroy(r.Context()); err != nil {
+			http.Error(w, "Server error", http.StatusInternalServerError)
+			return
+		}
+		// Redirect to home page after logout
+		http.Redirect(w, r, "/", http.StatusSeeOther)
 	})
 
 	r.Get("/verify", func(w http.ResponseWriter, r *http.Request) {
