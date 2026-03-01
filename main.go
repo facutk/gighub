@@ -149,6 +149,17 @@ func main() {
 			}
 			http.Redirect(w, r, "/guestbook", http.StatusSeeOther)
 		})
+
+		r.Get("/account", func(w http.ResponseWriter, r *http.Request) {
+			userID := sessionManager.GetInt64(r.Context(), "userID")
+			log.Printf("User ID from session: %d", userID)
+			user, err := queries.GetUser(r.Context(), userID)
+			if err != nil {
+				http.Error(w, "Database error", http.StatusInternalServerError)
+				return
+			}
+			views.Account(user.Email).Render(r.Context(), w)
+		})
 	})
 
 	// Email test route
@@ -212,6 +223,7 @@ func main() {
 			http.Error(w, "Server error", http.StatusInternalServerError)
 			return
 		}
+		log.Printf("Logging in user ID: %d", user.ID)
 		sessionManager.Put(r.Context(), "userID", user.ID)
 		http.Redirect(w, r, "/guestbook", http.StatusSeeOther)
 	})

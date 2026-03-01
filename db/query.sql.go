@@ -98,8 +98,26 @@ func (q *Queries) GetSession(ctx context.Context, tokenHash string) (GetSessionR
 	return i, err
 }
 
+const getUser = `-- name: GetUser :one
+SELECT id, email, password_hash, created_at, verification_token, verified_at FROM users WHERE id = ?
+`
+
+func (q *Queries) GetUser(ctx context.Context, id int64) (User, error) {
+	row := q.db.QueryRowContext(ctx, getUser, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.PasswordHash,
+		&i.CreatedAt,
+		&i.VerificationToken,
+		&i.VerifiedAt,
+	)
+	return i, err
+}
+
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, password_hash, created_at, verification_token, verified_at FROM users WHERE email = ?
+SELECT id, email, password_hash, created_at, verification_token, verified_at FROM users WHERE email = ? LIMIT 1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {

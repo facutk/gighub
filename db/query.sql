@@ -14,6 +14,9 @@ RETURNING *;
 -- name: GetUserByEmail :one
 SELECT * FROM users WHERE email = ?;
 
+-- name: GetUser :one
+SELECT * FROM users WHERE id = ?;
+
 -- name: CreateSession :exec
 INSERT INTO sessions (token_hash, user_id, expiry)
 VALUES (?, ?, ?);
