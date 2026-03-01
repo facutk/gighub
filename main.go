@@ -18,6 +18,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/joelseq/sqliteadmin-go"
 	"github.com/joho/godotenv"
+	"github.com/justinas/nosurf"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -76,7 +77,7 @@ func main() {
 				return
 			}
 		}
-		views.Guestbook(msg).Render(r.Context(), w)
+		views.Guestbook(msg, nosurf.Token(r)).Render(r.Context(), w)
 	})
 
 	r.Post("/guestbook", func(w http.ResponseWriter, r *http.Request) {
@@ -105,14 +106,16 @@ func main() {
 	// Auth routes
 	r.Get("/signup", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
-		w.Write([]byte(`
+		// Pass the CSRF token to the form
+		w.Write([]byte(fmt.Sprintf(`
 			<h1>Sign Up</h1>
 			<form action="/signup" method="post">
+				<input type="hidden" name="csrf_token" value="%s">
 				<label>Email: <input type="email" name="email" required></label><br>
 				<label>Password: <input type="password" name="password" required></label><br>
 				<button type="submit">Sign Up</button>
 			</form>
-		`))
+		`, nosurf.Token(r))))
 	})
 
 	r.Post("/signup", func(w http.ResponseWriter, r *http.Request) {
@@ -181,7 +184,7 @@ func main() {
 	r.Get("/version", func(w http.ResponseWriter, r *http.Request) {
 		gitSHA := os.Getenv("GITSHA")
 		if gitSHA == "" {
-			gitSHA = "dev" // Default for local development
+			gitSHA = "local" // Default for local development
 		}
 		w.Header().Set("Content-Type", "text/plain")
 		w.Write([]byte(gitSHA))
@@ -195,9 +198,18 @@ func main() {
 		port = "3000"
 	}
 
+	// Add CSRF protection middleware
+	csrfHandler := nosurf.New(r)
+	csrfHandler.ExemptPath("/admin")
+	csrfHandler.SetBaseCookie(http.Cookie{
+		HttpOnly: true,
+		Path:     "/",
+		Secure:   os.Getenv("ENV") == "production",
+	})
+
 	// Start the server
 	fmt.Printf("Server starting on port %s...\n", port)
-	err = http.ListenAndServe(":"+port, r)
+	err = http.ListenAndServe(":"+port, csrfHandler) // Wrap router with CSRF handler
 	if err != nil {
 		fmt.Printf("Error starting server: %s\n", err)
 	}

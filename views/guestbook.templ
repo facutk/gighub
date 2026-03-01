@@ -1,6 +1,6 @@
 package views
 
-templ Guestbook(message string) {
+templ Guestbook(message string, csrfToken string) {
 	@Layout("Guestbook") {
 		<div>
 			<div class="max-w-md mx-auto bg-white rounded-xl shadow-md overflow-hidden md:max-w-2xl p-6">
@@ -10,6 +10,7 @@ templ Guestbook(message string) {
 					<p class="mt-1 text-lg text-gray-800">{ message }</p>
 				</div>
 				<form action="/guestbook" method="POST" class="space-y-4">
+					<input type="hidden" name="csrf_token" value={ csrfToken }/>
 					<div>
 						<label for="message" class="block text-sm font-medium text-gray-700">Update Message</label>
 						<input type="text" name="message" id="message" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2" placeholder="Type a new message..." required/>
