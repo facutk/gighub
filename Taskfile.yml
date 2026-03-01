@@ -9,7 +9,7 @@ tasks:
 
   dev:templ:
     cmds:
-      - templ generate --watch --proxy="http://localhost:3000" --proxyport=7331 --cmd="go run ."
+      - templ generate --watch --proxy="http://localhost:3000" --proxyport=7331 --proxybind="localhost" --cmd="go run ."
 
   dev:tailwind:
     cmds:
