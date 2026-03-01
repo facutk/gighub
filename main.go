@@ -86,6 +86,7 @@ func main() {
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := context.WithValue(r.Context(), "isLoggedIn", sessionManager.Exists(r.Context(), "userID"))
+			ctx = context.WithValue(ctx, "csrf", nosurf.Token(r))
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	})
@@ -141,7 +142,7 @@ func main() {
 					return
 				}
 			}
-			views.Guestbook(msg, nosurf.Token(r)).Render(r.Context(), w)
+			views.Guestbook(msg).Render(r.Context(), w)
 		})
 
 		r.Post("/guestbook", func(w http.ResponseWriter, r *http.Request) {
@@ -291,18 +292,7 @@ func main() {
 	})
 
 	r.Get("/login", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html")
-		w.Write([]byte(fmt.Sprintf(`
-			<h1>Login</h1>
-			<form action="/login" method="post">
-				<input type="hidden" name="csrf_token" value="%s">
-				<label>Email: <input type="email" name="email" required></label><br>
-				<label>Password: <input type="password" name="password" required></label><br>
-				<button type="submit">Login</button>
-			</form>
-			<hr>
-			<a href="/auth/google">Login with Google</a>
-		`, nosurf.Token(r))))
+		views.Login().Render(r.Context(), w)
 	})
 
 	r.Post("/login", func(w http.ResponseWriter, r *http.Request) {

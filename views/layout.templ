@@ -9,6 +9,13 @@ func isAuth(ctx context.Context) bool {
 	return false
 }
 
+func CSRF(ctx context.Context) string {
+	if val, ok := ctx.Value("csrf").(string); ok {
+		return val
+	}
+	return ""
+}
+
 templ Layout(title string) {
 	<html lang="en">
 		<head>

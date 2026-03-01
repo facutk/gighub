@@ -117,7 +117,7 @@ func (q *Queries) GetUser(ctx context.Context, id int64) (User, error) {
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, password_hash, created_at, verification_token, verified_at FROM users WHERE email = ? LIMIT 1
+SELECT id, email, password_hash, created_at, verification_token, verified_at FROM users WHERE email = ?
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
