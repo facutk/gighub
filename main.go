@@ -107,6 +107,10 @@ func main() {
 		views.PrivacyPolicy().Render(r.Context(), w)
 	})
 
+	r.Get("/bounce-logo-privacy-policy", func(w http.ResponseWriter, r *http.Request) {
+		views.BounceLogoPrivacyPolicy().Render(r.Context(), w)
+	})
+
 	r.Get("/terms", func(w http.ResponseWriter, r *http.Request) {
 		views.Terms().Render(r.Context(), w)
 	})
@@ -168,16 +172,6 @@ func main() {
 			}
 			views.Account(user.Email).Render(r.Context(), w)
 		})
-	})
-
-	// Email test route
-	r.Get("/email", func(w http.ResponseWriter, r *http.Request) {
-		to := r.URL.Query().Get("to")
-		if err := sendEmail(to, "Test Email", "This is a test email from your Go app."); err != nil {
-			http.Error(w, "Failed to send email: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-		w.Write([]byte("Email sent successfully to " + to))
 	})
 
 	// Social Auth Routes
@@ -278,7 +272,7 @@ func main() {
 			}
 		}()
 
-		w.Write([]byte("User created! Please check your email to verify your account."))
+		views.SignupSuccess(email).Render(r.Context(), w)
 	})
 
 	r.Get("/login", func(w http.ResponseWriter, r *http.Request) {
