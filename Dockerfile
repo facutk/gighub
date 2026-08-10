@@ -17,8 +17,11 @@ RUN npx tailwindcss -i ./assets/css/input.css -o ./assets/css/styles.css --minif
 # Stage 2: Backend builder for Go binary
 FROM golang:1.24-alpine AS backend-builder
 
-# Install templ tool
-RUN go install github.com/a-h/templ/cmd/templ@latest
+# Install git (required for fetching go modules/tools in Alpine)
+RUN apk add --no-cache git
+
+# Install templ tool (pinned to matching version from go.mod)
+RUN go install github.com/a-h/templ/cmd/templ@v0.3.977
 
 WORKDIR /app
 
