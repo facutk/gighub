@@ -20,15 +20,15 @@ FROM golang:1.24-alpine AS backend-builder
 # Install git (required for fetching go modules/tools in Alpine)
 RUN apk add --no-cache git
 
-# Install templ tool (pinned to matching version from go.mod)
-RUN go install github.com/a-h/templ/cmd/templ@v0.3.977
-
 WORKDIR /app
 
 # Copy go module files and download dependencies
 # This is done first to leverage Docker layer caching
 COPY go.mod go.sum ./
 RUN go mod download
+
+# Install templ tool (version derived from go.mod, no hardcoded version)
+RUN go install github.com/a-h/templ/cmd/templ@$(go list -m -f '{{.Version}}' github.com/a-h/templ)
 
 # Copy the rest of the application source code
 COPY . .
