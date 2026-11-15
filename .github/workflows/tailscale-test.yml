@@ -33,3 +33,21 @@ jobs:
           else
             echo "Good: PostgreSQL is not accessible."
           fi
+
+
+      - name: Configure SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/gighub_deploy
+          chmod 600 ~/.ssh/gighub_deploy
+          ssh-keyscan -H 100.104.196.51 >> ~/.ssh/known_hosts
+
+      - name: Test SSH authentication
+        run: |
+          ssh -i ~/.ssh/gighub_deploy \
+            -o IdentitiesOnly=yes \
+            debian@100.104.196.51 \
+            'hostname && whoami && docker ps'
